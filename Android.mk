@@ -1,8 +1,8 @@
 LOCAL_PATH:= $(call my-dir)
 
 include $(CLEAR_VARS)
-LOCAL_SRC_FILES:= factory-test-client.c data.c
-LOCAL_MODULE:= factory-test-client
+LOCAL_SRC_FILES:= factory_test_client.c data.c factory_test_function serial_test.c
+LOCAL_MODULE:= factory_test_client
 LOCAL_32_BIT_ONLY := true
 
 include $(BUILD_EXECUTABLE)
