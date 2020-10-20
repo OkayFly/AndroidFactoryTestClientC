@@ -9,8 +9,8 @@
 #define DATA_HEAD (0xAA)
 #define DATA_TAIL (0x55)
 
-
-char CPU_ID[64];
+bool STOPTEST = false;
+extern char CPU_ID[64];
 //#define DATA_TRANSLATE (0xCC)
 
 
@@ -69,10 +69,10 @@ void process_data(unsigned char* data, int length)
         get_mac(data+1, length-1);
         break;
     case CTRL_SEND_DATA:
-        get_mac(data+1, length-1);
+        //get_mac(data+1, length-1);
         break;
     case CTRL_DATA_END:
-        get_mac(data+1, length-1);
+        //get_mac(data+1, length-1);
         break;
     default:
         break;
@@ -93,6 +93,7 @@ void get_mac(unsigned char* data, int length)
     if(strcmp(data, CPU_ID) == 0)
     {
 	printf("okkkkkkkkkkkkkkkkkkkkkkkkk\n");
+    STOPTEST = true;
     }
 }
 
@@ -124,4 +125,33 @@ void get_cpu_sn(char* cpu_sn_buffer)
         }
     }
     memcpy(CPU_ID, cpu_sn_buffer,strlen(cpu_sn_buffer));
+}
+
+void save_test_result(AndriodProduct* product)
+{
+    printf("\n** \t\t %s\n",__func__);
+    FILE *fp;
+    unsigned  char* filename = (unsigned char*)malloc(strlen(product->cpu_sn)+5);
+    if(filename == NULL)
+        printf("error maclloc\n");
+    //fprintf(filename, "%s.txt",name);
+    memcpy(filename, product->cpu_sn, strlen(product->cpu_sn));
+    memcpy(filename+ strlen(product->cpu_sn), ".txt", sizeof(".txt"));
+    printf("filename:%s\n",filename);
+
+    if((fp = fopen(filename, "wb")) == NULL)
+    {
+        printf("\t\tXXX error cant open %s\n",filename);
+        return;
+    }
+
+    fprintf(fp, "%s",product->cpu_sn);
+    fclose(fp);
+    for(int i=0; i<30;i++)
+    {
+        printf(">");
+    }
+    printf("%s\n",filename);
+    printf("save %s ok\n",filename);
+    free(filename);
 }
