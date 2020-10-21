@@ -715,12 +715,26 @@ struct command* userinputtocommand(char s[LENUSERINPUT])
 
 
 static void serial_process_read_data(void);
-static void serial_process_write_data()
+static void serial_process_write_data(char* serial)
 {
+	char cmd;
+	if( !strncmp(serial, TTYS1Port, strlen(TTYS1Port)))
+	{
+		cmd = CTRL_SEND_TTYS1_MAC;
+	}
+	else if(!strncmp(serial, TTYS3Port, strlen(TTYS3Port)))
+	{
+		cmd = CTRL_SEND_TTYS3_MAC;
+	}
+	else
+	{
+		printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE:%s\n", serial);
+		return;
+	}
 	char write_data[120];
 	//wrap_data(CPU_ID, CTRL_SEND_MAC);
 	write_data[0] = 0xAA;
-	write_data[1] = CTRL_SEND_MAC;
+	write_data[1] = cmd;
 	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
 	write_data[2+strlen(CPU_ID)] = 0x55;
 	write_data[3+strlen(CPU_ID)] = '\0';
@@ -748,12 +762,12 @@ static void serial_process_read_data(void)
 	if(get_data(rb, c, data, &data_length) == DATA_PROCESS_SUCCESS)
 	{
 		
-		printf("get data:%s, length[%d]\n",data, data_length);
+		printf("("=====================================>get data:%s, length[%d]\n",data, data_length);
 
-		// for(int i=0; i<data_length; i++)
-		// {
-		// 	printf("\t\t %02x\t", data[i]);
-		// }
+		for(int i=0; i<data_length; i++)
+		{
+			printf("\t\t %02x ", data[i]);
+		}
 		process_data(data, data_length);
 	
 	}
@@ -846,7 +860,7 @@ void serial_process(char* serial)
 		}
 		else if(retval)
 		{
-			serial_process_write_data();
+			serial_process_write_data( serial);
 			last_read = current;
 		}
 

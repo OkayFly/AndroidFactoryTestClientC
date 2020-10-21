@@ -29,9 +29,11 @@ typedef struct
 }AndriodProduct;
 
 typedef enum {
-    CTRL_SEND_MAC = 0x80,
-    CTRL_SEND_DATA = 0x81,
-    CTRL_DATA_END,
+    CTRL_SEND_TTYS1_MAC = 0x80,
+    CTRL_SEND_TTYS3_MAC,
+    CTRL_SEND_CAN0_MAC,
+    CTRL_SEND_CAN1_MAC,
+    CTRL_END,
 }ctrl_t;
 
 DPStatus get_data( unsigned char* in,  int length,  unsigned char* out, int* out_length);

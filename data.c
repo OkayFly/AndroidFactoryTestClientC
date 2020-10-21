@@ -16,6 +16,12 @@ extern char CPU_ID[64];
 
 DPStatus get_data( unsigned char* in,  int length, unsigned char* out, int* out_length)
 {
+    printf("get_data\n");
+    for(int i=0; i<length; i++)
+    {
+        printf("%0x2x ", in[i]);
+    }
+    printf("\n");
     bool has_head = false;
     int  head_index = 0;
 
@@ -65,13 +71,16 @@ void process_data(unsigned char* data, int length)
 {
     switch (data[0])
     {
-    case CTRL_SEND_MAC:
+    case CTRL_SEND_TTYS1_MAC:
         get_mac(data+1, length-1);
         break;
-    case CTRL_SEND_DATA:
+    case CTRL_SEND_TTYS3_MAC:
+        get_mac(data+1, length-1);
+        break;
+    case CTRL_SEND_CAN0_MAC:
         //get_mac(data+1, length-1);
         break;
-    case CTRL_DATA_END:
+    case CTRL_SEND_CAN1_MAC:
         //get_mac(data+1, length-1);
         break;
     default:
