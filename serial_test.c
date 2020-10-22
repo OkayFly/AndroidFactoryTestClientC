@@ -714,8 +714,8 @@ struct command* userinputtocommand(char s[LENUSERINPUT])
 }
 
 
-static void serial_process_read_data(void);
-static void serial_process_write_data(char* serial)
+static void serial_process_read_data(AndriodProduct* product);
+static void serial_process_write_data(char* serial, AndriodProduct* product)
 {
 	char cmd;
 	if( !strncmp(serial, TTYS1Port, strlen(TTYS1Port)))
@@ -748,11 +748,11 @@ static void serial_process_write_data(char* serial)
 	usleep(1000000);//1s
 	//while(1)
 	{
-		serial_process_read_data();
+		serial_process_read_data(product);
 	}
 	
 }
-static void serial_process_read_data(void)
+static void serial_process_read_data(AndriodProduct* product)
 {
 	unsigned char rb[95] = {};
 	unsigned char data[95] = {};
@@ -768,7 +768,7 @@ static void serial_process_read_data(void)
 		{
 			printf("\t\t %02x ", data[i]);
 		}
-		process_data(data, data_length);
+		process_data(data, data_length, product);
 	
 	}
 
@@ -813,7 +813,7 @@ static void serial_process_read_data(void)
 	// }
 }
 
-void serial_process(char* serial)
+void serial_process(char* serial, AndriodProduct* product)
 {
 	printf("**\t serail_process1111111111:%s\n", serial);
 	int baud = B115200;
@@ -860,7 +860,7 @@ void serial_process(char* serial)
 		}
 		else if(retval)
 		{
-			serial_process_write_data( serial);
+			serial_process_write_data( serial, product);
 			last_read = current;
 		}
 
@@ -888,8 +888,8 @@ void serial_process(char* serial)
 }
 
 
-void serial_test()
+void serial_test(AndriodProduct* product)
 {
-	serial_process(TTYS1Port);
-	serial_process(TTYS3Port);
+	serial_process(TTYS1Port, product);
+	serial_process(TTYS3Port, product);
 }

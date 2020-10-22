@@ -67,21 +67,25 @@ void wrap_data(unsigned char* data, int id)
 
 }
 
-void process_data(unsigned char* data, int length)
+void process_data(unsigned char* data, int length, AndriodProduct* product)
 {
     switch (data[0])
     {
     case CTRL_SEND_TTYS1_MAC:
-        get_mac(data+1, length-1);
+        get_mac(data+1, length-1, product);
+        product->TTYS1 = true;
         break;
     case CTRL_SEND_TTYS3_MAC:
-        get_mac(data+1, length-1);
+        get_mac(data+1, length-1, product);
+        product->TTYS3 = true;
         break;
     case CTRL_SEND_CAN0_MAC:
-        get_mac(data+1, length-1);
+        get_mac(data+1, length-1, product);
+        product->CAN0 = true;
         break;
     case CTRL_SEND_CAN1_MAC:
-        get_mac(data+1, length-1);
+        get_mac(data+1, length-1, product);
+        product->CAN1 = true;
         break;
     default:
         break;
@@ -90,7 +94,7 @@ void process_data(unsigned char* data, int length)
 }
 
 
-void get_mac(unsigned char* data, int length)
+void get_mac(unsigned char* data, int length, AndriodProduct* product)
 {
     printf("** get server data mac:\n");
 
@@ -166,7 +170,12 @@ void save_test_result(AndriodProduct* product)
         return;
     }
 
-    fprintf(fp, "%s",product->cpu_sn);
+    fprintf(fp, "%s:\n",product->cpu_sn);
+    fprintf(fp, "%s:[%s]\n",TTYS1Port ,product->TTYS1 ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",TTYS3Port ,product->TTYS3 ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN0Port ,product->CAN0 ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN1Port ,product->CAN1 ? "OK":"Fail");
+
     fclose(fp);
     for(int i=0; i<30;i++)
     {

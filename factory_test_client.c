@@ -41,8 +41,8 @@ int main(int argc, char * argv[])
 		printf("***************  Step1: serial_process  ***********\n");
 		printf("***************************************************\n");
 		printf("*****************************************\n");
-		//serial_test();
-		//can_test();
+		serial_test(&my_android);
+		can_test(&my_android);
 
 		if( strlen(my_android.cpu_sn) != 0)
 		{

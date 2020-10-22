@@ -3,7 +3,7 @@
 
 #include "data.h"
 
-void can_test();
-void can_process(char* canport);
+void can_test(AndriodProduct* product);
+void can_process(char* canport, AndriodProduct* product);
 
 #endif

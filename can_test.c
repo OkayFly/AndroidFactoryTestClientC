@@ -15,7 +15,7 @@
 extern bool STOPTEST;
 const int canfd_on = 1;
 
-static void can_process_read_data(int s, char* canport)
+static void can_process_read_data(int s, char* canport, AndriodProduct* product)
 {
     struct timeval timeout, timeout_config = { 0, 0 }, *timeout_current = NULL;
     timeout_config.tv_usec = 1000;//msecs// -T <msecs>  (terminate after <msecs> without any reception)\n"); //1s
@@ -108,7 +108,7 @@ static void can_process_read_data(int s, char* canport)
         // {
         // 	printf("\t\t %02x\t", data[i]);
         // }
-        process_data(data, data_length);
+        process_data(data, data_length, product);
         keepRead = false;
 
     }
@@ -128,7 +128,7 @@ static void can_process_read_data(int s, char* canport)
 }
 
 
-static int can_frame_process_write_data(int s, char* canport) // just use 8 bytes for write
+static int can_frame_process_write_data(int s, char* canport, AndriodProduct* product) // just use 8 bytes for write
 {
     printf("00000000000000000000000000000000000000000000000000000000000:%s\n", canport);
 
@@ -237,7 +237,7 @@ static int can_frame_process_write_data(int s, char* canport) // just use 8 byte
 
         usleep(100000);
         {
-            can_process_read_data(s, canport);
+            can_process_read_data(s, canport, product);
         }
 
         return 0;
@@ -340,7 +340,7 @@ void start_can(char* canport)
     judge_can_status(canport);
 }
 
-void can_process(char* canport)
+void can_process(char* canport, AndriodProduct* product)
 {
     int s; // can raw socket
     int i;
@@ -397,7 +397,7 @@ void can_process(char* canport)
     {
         struct timespec current;
 		clock_gettime(CLOCK_MONOTONIC, &current);
-        if( can_frame_process_write_data(s,canport) )
+        if( can_frame_process_write_data(s,canport, product) )
         {
             STOPTEST = true;
         }
@@ -415,8 +415,8 @@ void can_process(char* canport)
 	return ;
 }
 
-void can_test()
+void can_test(AndriodProduct* product)
 {
-    can_process(CAN0Port);
-    can_process(CAN1Port);
+    can_process(CAN0Port, product);
+    can_process(CAN1Port, product);
 }

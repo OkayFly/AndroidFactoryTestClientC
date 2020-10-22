@@ -37,8 +37,8 @@ typedef enum {
 }ctrl_t;
 
 DPStatus get_data( unsigned char* in,  int length,  unsigned char* out, int* out_length);
-void process_data( unsigned char* data, int length);
-void get_mac( unsigned char* data, int length);
+void process_data( unsigned char* data, int length,AndriodProduct* product);
+void get_mac( unsigned char* data, int length, AndriodProduct* product);
 void get_cpu_sn(char* cpu_sn_buffer);
 void wrap_dat(unsigned char* data, int id);
 void save_test_result(AndriodProduct* product);
