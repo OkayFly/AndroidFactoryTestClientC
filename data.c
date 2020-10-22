@@ -78,10 +78,10 @@ void process_data(unsigned char* data, int length)
         get_mac(data+1, length-1);
         break;
     case CTRL_SEND_CAN0_MAC:
-        //get_mac(data+1, length-1);
+        get_mac(data+1, length-1);
         break;
     case CTRL_SEND_CAN1_MAC:
-        //get_mac(data+1, length-1);
+        get_mac(data+1, length-1);
         break;
     default:
         break;
@@ -96,19 +96,31 @@ void get_mac(unsigned char* data, int length)
 
     for(int i=0; i<length; i++)
     {
-        printf("\t\t %02x \t\t", data[i]);
+        printf("%02x", data[i]);
     }
-    printf("CPU_ID:%s\n",CPU_ID);
-    if(strcmp(data, CPU_ID) == 0)
+    printf("\nCPU_ID:%s\n",CPU_ID);
+    if(strncmp(data, CPU_ID, strlen(CPU_ID)) == 0)
     {
 	printf("okkkkkkkkkkkkkkkkkkkkkkkkk\n");
+    fflush(stdout);
     STOPTEST = true;
     }
+    else
+    {
+   printf("wfk\n");
+	for(int i=0; i<strlen(CPU_ID); i++ )
+	{
+		printf("%02x ", CPU_ID[i]);
+	}
+	printf("\n");
+    STOPTEST = true;
+    }
+    
 }
 
 void get_cpu_sn(char* cpu_sn_buffer)
 {
-	    FILE *fp;
+	FILE *fp;
     int nread =0;
     char *file = "/proc/cpuinfo";
     char *buffer = NULL;

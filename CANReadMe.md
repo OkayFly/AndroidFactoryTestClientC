@@ -34,4 +34,17 @@ ps
 
  
 
-echo  4096 > /sys/class/net/can0/tx_queue_len
+echo  4096 > /sys/class/net/can0/tx_queue_len\
+
+
+         write_data:��270277098f2097dbU
+aa 81 32 37 30 32 37 37 30 39 38 66 32 30 39 37 64 62 55 get_data
+
+aa 82 32 37 30 32 37 55 success to Sent out
+30 39 38 66 32 30 39 37 success to Sent out
+64 55 success to Sent out
+
+
+
+                 cpu_sn:270277098f2097db
+32 37 30 32 37 37 30 39 38 66 32 30 39 37 64 62

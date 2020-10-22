@@ -21,6 +21,11 @@ int main(int argc, char * argv[])
 
 	get_cpu_sn(my_android.cpu_sn);
 	printf("\t\t cpu_sn:%s\n",my_android.cpu_sn);
+	for(int i=0; i<strlen(my_android.cpu_sn); i++ )
+	{
+		printf("%02x ", my_android.cpu_sn[i]);
+	}
+	printf("\n");
 	// char userinput[LENUSERINPUT];
 	// struct command* cmd;
 
@@ -36,8 +41,8 @@ int main(int argc, char * argv[])
 		printf("***************  Step1: serial_process  ***********\n");
 		printf("***************************************************\n");
 		printf("*****************************************\n");
-		serial_test();
-		can_test();
+		//serial_test();
+		//can_test();
 
 		if( strlen(my_android.cpu_sn) != 0)
 		{

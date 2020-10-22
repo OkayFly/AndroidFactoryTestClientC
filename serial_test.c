@@ -762,7 +762,7 @@ static void serial_process_read_data(void)
 	if(get_data(rb, c, data, &data_length) == DATA_PROCESS_SUCCESS)
 	{
 		
-		printf("("=====================================>get data:%s, length[%d]\n",data, data_length);
+		printf("=====================================>get data:%s, length[%d]\n",data, data_length);
 
 		for(int i=0; i<data_length; i++)
 		{
