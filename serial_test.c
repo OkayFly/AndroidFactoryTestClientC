@@ -734,7 +734,7 @@ static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 
 	}
 	ssize_t c = write(_fd, write_data,strlen(write_data));
-	usleep(1000000);//1s
+	usleep(100);//1s
 	//while(1)
 	{
 		serial_process_read_data(product, fsm);
@@ -818,8 +818,8 @@ void serial_process(char* serial, AndriodProduct* product)
 
 	printf("** \t wait write cpu ID\n");
 	fflush(stdout);
-	struct timespec start_write;
-	clock_gettime(CLOCK_MONOTONIC, &start_write);
+	struct timespec start_time;
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
 
 	struct timespec current;
 
@@ -860,7 +860,6 @@ void serial_process(char* serial, AndriodProduct* product)
 			break;
 		case FSM_GET_MAC:
 			reply_end( serial, product, &fsm);
-		
 			break;
 		case FSM_GET_END:
 			STOPTEST = true;
@@ -871,7 +870,7 @@ void serial_process(char* serial, AndriodProduct* product)
 
 	clock_gettime(CLOCK_MONOTONIC, &current);
 
-	if(diff_ms(&current,&start_write) >= 30000 )//30s
+	if(diff_ms(&current,&start_time) >= 30000 )//30s
 	{
 		printf("\t\t Error %s time consuming >30s but can't receive corrent data\n", serial);
 		STOPTEST = true;
@@ -887,8 +886,6 @@ void serial_process(char* serial, AndriodProduct* product)
 	set_modem_lines(_fd, 0, TIOCM_LOOP);
 	tcflush(_fd, TCIOFLUSH);
 	//free(_cl_port);
-
-
 	STOPTEST = false;
 
 }

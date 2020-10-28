@@ -15,7 +15,7 @@
 extern bool STOPTEST;
 const int canfd_on = 1;
 
-static void can_process_read_data(int s, char* canport, AndriodProduct* product)
+static void can_process_read_data(int s, char* canport, AndriodProduct* product, fsm_state_t* fsm)
 {
     struct timeval timeout, timeout_config = { 0, 0 }, *timeout_current = NULL;
     timeout_config.tv_usec = 1000;//msecs// -T <msecs>  (terminate after <msecs> without any reception)\n"); //1s
@@ -44,12 +44,10 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
         //exit(-3);
         return;
     }
-    /* keep reading */
-    bool keepRead = true;
     struct  timespec start_time;
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
-
-    while(keepRead){
+    struct timespec current;
+    while(1){ //为什么要循环读取
 
         FD_ZERO(&rdfs);
         FD_SET(s,&rdfs);
@@ -63,13 +61,10 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
 		if ((select(s+1, &rdfs, NULL, NULL, timeout_current)) <= 0) {
 			perror("select");
             printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~Iiiiii~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-			keepRead = false;
-            continue;
+            return;;
 		}
 
         printf("\n\t~~~~~~~~~~~~~~~read\n\t");
-		struct timespec current;
-		clock_gettime(CLOCK_MONOTONIC, &current);
 
         unsigned char data[95] = {0};
 	    int data_length;
@@ -90,35 +85,32 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
         memcpy(&receive_data[receive_len], &frame.data[0], frame.can_dlc);
         receive_len += frame.can_dlc;
 
-
-
-
-
-    if(get_data(receive_data, receive_len, data, &data_length) == DATA_PROCESS_SUCCESS)
-    {
-        memset(receive_data, 0, sizeof(receive_data));
-        receive_len = 0;
-        printf("=====================================>get data:%s, length[%d]\n",data, data_length);
-        for(int i=0; i< data_length; i++)
+        if(get_data(receive_data, receive_len, data, &data_length) == DATA_PROCESS_SUCCESS)
         {
-            printf("-------------------get data:%02x\n", data[i]);
+            memset(receive_data, 0, sizeof(receive_data));
+            receive_len = 0;
+            printf("=====================================>get data:%s, length[%d]\n",data, data_length);
+            for(int i=0; i< data_length; i++)
+            {
+                printf("-------------------get data:%02x\n", data[i]);
+            }
+
+            // for(int i=0; i<data_length; i++)
+            // {
+            // 	printf("\t\t %02x\t", data[i]);
+            // }
+            process_data(data, data_length, product, fsm);
+            return;
+            
+
         }
 
-        // for(int i=0; i<data_length; i++)
-        // {
-        // 	printf("\t\t %02x\t", data[i]);
-        // }
-       // process_data(data, data_length, product); TODO
-        keepRead = false;
-
-    }
-
-
-    if(diff_ms(&current,&start_time) >= 1000 )//1s
-    {
-        printf("\t\t Error %s time consuming >1s but can't read data\n", canport);
-        keepRead = false;
-    }
+        clock_gettime(CLOCK_MONOTONIC, &current);
+        if(diff_ms(&current,&start_time) >= 100 )//1s
+        {
+            printf("\t\t Error %s time consuming >0.1s but can't read data\n", canport);
+            return;
+        }
 
 
 
@@ -128,7 +120,111 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
 }
 
 
-static int can_frame_process_write_data(int s, char* canport, AndriodProduct* product) // just use 8 bytes for write
+static int reply_end(int s, char* canport, AndriodProduct* product, fsm_state_t* fsm)
+{
+    printf("00000000000000000000000000000000000000000000000000000000000:%s\n", canport);
+
+        char cmd = CTRL_SEND_END;
+        struct can_frame frame_send;
+
+        int cursor = 0;
+        /* configure can_id and can data length */
+	    frame_send.can_id = 0x88;
+		frame_send.can_dlc = 8;
+		printf("%s ID=%#x data length=%d\n", "ifr.ifr_name", frame_send.can_id, frame_send.can_dlc);
+		/* prepare data for sending: 0xAA,0x81,0x11,0x11,0x11,0x11,0x11,0x55 */
+        printf("sizeof can_frame.data:%d\n",sizeof(frame_send.data));
+
+        //第一帧
+        frame_send.data[0] = 0xAA;
+        frame_send.data[1] = cmd;
+        for(int i=2;i<8;i++)//6
+        {
+            frame_send.data[i] = CPU_ID[cursor++];
+        }
+		for (int i=0; i<8; i++) 
+		{
+            printf("%02x ", frame_send.data[i]);
+		}
+		printf("success to Sent out\n");
+		/* Sending data */
+		if(write(s, &frame_send, sizeof(frame_send)) < 0)
+        {
+        perror("Send failed");
+        sleep(1);
+        //close(s);
+        //exit(-4);
+        return 2;
+        }
+        usleep(100);
+        {
+           // can_process_read_data(s, canport);
+        }
+        //第2帧
+        for(int i=0;i<8;i++) //8
+        {
+            frame_send.data[i] = CPU_ID[cursor++];
+        }
+		for (int i=0; i<8; i++)
+		{
+		    // frame_send.data[i] = ((i+1)<<4) | (i+1);
+            //         frame_send.data[7] =number;
+		    // printf("%#x ", frame_send.data[i]);
+            printf("%02x ", frame_send.data[i]);
+		}
+		printf("success to Sent out\n");
+		/* Sending data */
+		if(write(s, &frame_send, sizeof(frame_send)) < 0)
+        {
+        perror("Send failed");
+        sleep(1);
+        //close(s);
+        //exit(-4);
+        return 2;
+        }
+
+         usleep(100);
+        {
+           // can_process_read_data(s, canport);
+        }
+
+        //第3帧
+        frame_send.can_dlc = 3;  //2
+        frame_send.data[0] = CPU_ID[cursor++];
+        frame_send.data[1] = CPU_ID[cursor++];
+        frame_send.data[2] = 0x55;
+
+     
+		for (int i=0; i<2; i++)
+		{
+		    // frame_send.data[i] = ((i+1)<<4) | (i+1);
+            //         frame_send.data[7] =number;
+		    // printf("%#x ", frame_send.data[i]);
+            printf("%02x ", frame_send.data[i]);
+		}
+		printf("success to Sent out\n");
+		/* Sending data */
+		if(write(s, &frame_send, sizeof(frame_send)) < 0)
+        {
+        perror("Send failed");
+        sleep(1);
+        //close(s);
+        //exit(-4);
+        return 2;
+        }
+
+        usleep(100);
+        {
+            can_process_read_data(s, canport, product, fsm);
+        }
+
+        return 0;
+
+}
+
+
+
+static int can_frame_process_write_data(int s, char* canport, AndriodProduct* product, fsm_state_t* fsm)
 {
     printf("00000000000000000000000000000000000000000000000000000000000:%s\n", canport);
 
@@ -166,7 +262,7 @@ static int can_frame_process_write_data(int s, char* canport, AndriodProduct* pr
         //exit(-4);
         return 2;
         }
-        usleep(100000);
+        usleep(100);
         {
            // can_process_read_data(s, canport);
         }
@@ -193,7 +289,7 @@ static int can_frame_process_write_data(int s, char* canport, AndriodProduct* pr
         return 2;
         }
 
-         usleep(100000);
+         usleep(100);
         {
            // can_process_read_data(s, canport);
         }
@@ -223,9 +319,9 @@ static int can_frame_process_write_data(int s, char* canport, AndriodProduct* pr
         return 2;
         }
 
-        usleep(100000);
+        usleep(100);
         {
-            can_process_read_data(s, canport, product);
+            can_process_read_data(s, canport, product, fsm);
         }
 
         return 0;
@@ -373,31 +469,51 @@ void can_process(char* canport, AndriodProduct* product)
 	     return;
 	}
 
-    printf("** \t wait write cpu ID\n");
+	printf("** \t wait write cpu ID\n");
 	fflush(stdout);
-	struct timespec start_time, last_time, last_read, last_write;
+	struct timespec start_time;
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
-	last_time = start_time;
-	last_read = start_time;
-	last_write = start_time;
+
+	struct timespec current;
+
+	fsm_state_t fsm;
+	if(!strcmp(serial, CAN0Port))
+		fsm = product->CAN0;
+	else if(!strcmp(serial, CAN1Port))
+		fsm = product->CAN1;
+	else
+	{
+		printf("mddddddddddddddddddddddddddddddddddddddddd\n");
+	}
+
     while(!STOPTEST)
     {
-        struct timespec current;
-		clock_gettime(CLOCK_MONOTONIC, &current);
-        if( can_frame_process_write_data(s,canport, product) )
+
+        switch (fsm)
+		{
+		case FSM_IDLE:
+			can_frame_process_write_data( s, canport, product,  &fsm);
+			break;
+		case FSM_GET_MAC:
+			reply_end( serial, product, &fsm);
+			break;
+		case FSM_GET_END:
+			STOPTEST = true;
+			break;
+		default:
+			break;
+		}
+
+        clock_gettime(CLOCK_MONOTONIC, &current);
+
+        if(diff_ms(&current,&start_time) >= 30000 )//30s
         {
+            printf("\t\t Error %s time consuming >30s but can't receive corrent data\n", serial);
             STOPTEST = true;
         }
-
-        
-		if(diff_ms(&current,&start_time) >= 10000 )//10s
-		{
-			printf("\t\t Error %s time consuming >10s but can't translate corrent data\n", canport);
-			STOPTEST = true;
-		}
             
 	 }
-     STOPTEST = false;
+
 	close(s);
 	return ;
 }

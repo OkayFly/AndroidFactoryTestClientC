@@ -189,10 +189,10 @@ void save_test_result(AndriodProduct* product)
     }
 
     fprintf(fp, "%s:\n",product->cpu_sn);
-    fprintf(fp, "%s:[%s]\n",TTYS1Port ,product->TTYS1 ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",TTYS3Port ,product->TTYS3 ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",CAN0Port ,product->CAN0 ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",CAN1Port ,product->CAN1 ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",TTYS1Port ,product->TTYS1 == FSM_GET_END ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",TTYS3Port ,product->TTYS3 == FSM_GET_END ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN0Port ,product->CAN0 == FSM_GET_END ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN1Port ,product->CAN1 == FSM_GET_END ? "OK":"Fail");
 
     fclose(fp);
     for(int i=0; i<30;i++)
