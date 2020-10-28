@@ -7,7 +7,7 @@
 #include "serial_test.h"
 #include "can_test.h"
 
-AndriodProduct my_android = {'\0', 0, 0, 0, 0, true};
+AndriodProduct my_android = {'\0', FSM_IDLE, FSM_IDLE, FSM_IDLE, FSM_IDLE, true};
 char CPU_ID[64];
 
 int main(int argc, char * argv[])
@@ -29,7 +29,6 @@ int main(int argc, char * argv[])
 	// char userinput[LENUSERINPUT];
 	// struct command* cmd;
 
-	//while(1)
 	{
 		//printf("\t^_^ please input [START] and click [Enter] end for the [%d]'s factory test^_^\t\n:", ++test_count);
 		//fgets(userinput, LENUSERINPUT, stdin);

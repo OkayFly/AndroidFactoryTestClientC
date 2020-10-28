@@ -714,23 +714,12 @@ struct command* userinputtocommand(char s[LENUSERINPUT])
 }
 
 
-static void serial_process_read_data(AndriodProduct* product);
-static void serial_process_write_data(char* serial, AndriodProduct* product)
+static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm);
+
+
+static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 {
-	char cmd;
-	if( !strncmp(serial, TTYS1Port, strlen(TTYS1Port)))
-	{
-		cmd = CTRL_SEND_TTYS1_MAC;
-	}
-	else if(!strncmp(serial, TTYS3Port, strlen(TTYS3Port)))
-	{
-		cmd = CTRL_SEND_TTYS3_MAC;
-	}
-	else
-	{
-		printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE:%s\n", serial);
-		return;
-	}
+	char cmd = CTRL_SEND_END;
 	char write_data[120];
 	//wrap_data(CPU_ID, CTRL_SEND_MAC);
 	write_data[0] = 0xAA;
@@ -748,11 +737,38 @@ static void serial_process_write_data(char* serial, AndriodProduct* product)
 	usleep(1000000);//1s
 	//while(1)
 	{
-		serial_process_read_data(product);
+		serial_process_read_data(product, fsm);
 	}
 	
 }
-static void serial_process_read_data(AndriodProduct* product)
+
+static void serial_process_write_data(char* serial, AndriodProduct* product, fsm_state_t* fsm)
+{
+	char cmd = CTRL_SEND_MAC;
+	char write_data[120];
+	//wrap_data(CPU_ID, CTRL_SEND_MAC);
+	write_data[0] = 0xAA;
+	write_data[1] = cmd;
+	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
+	write_data[2+strlen(CPU_ID)] = 0x55;
+	write_data[3+strlen(CPU_ID)] = '\0';
+	printf("\n\t write_data:%s\n",write_data);
+	for(int i=0; i<strlen(write_data);i++)
+	{	
+		printf("%02x ", write_data[i]);
+
+	}
+	ssize_t c = write(_fd, write_data,strlen(write_data));
+	usleep(1000000);//1s
+	//while(1)
+	{
+		serial_process_read_data(product, fsm);
+	}
+	
+}
+
+
+static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm)
 {
 	unsigned char rb[95] = {};
 	unsigned char data[95] = {};
@@ -768,49 +784,9 @@ static void serial_process_read_data(AndriodProduct* product)
 		{
 			printf("\t\t %02x ", data[i]);
 		}
-		process_data(data, data_length, product);
+		process_data(data, data_length, product, fsm);
 	
 	}
-
-
-
-	// //if(serial_unpack_for_cpuid(rb))
-	// {
-	// //	printf("**\t get data:%s\n",data);
-	// //	printf("**\t {OK} get cpuID[]\n");
-	// }
-
-
-	// if (c > 0) {
-	// 	if (_cl_rx_dump) {
-	// 		if (_cl_rx_dump_ascii)
-	// 			dump_data_ascii(rb, c);
-	// 		else
-	// 			dump_data(rb, c);
-	// 	}
-
-	// 	// verify read count is incrementing
-	// 	int i;
-	// 	for (i = 0; i < c; i++) {
-	// 		printf("\n**\t read:[%02x]",rb[i]);
-	// 		if (rb[i] != _read_count_value) {
-	// 			if (_cl_dump_err) {
-	// 				printf("Error, count: %lld, expected %02x, got %02x\n",
-	// 						_read_count + i, _read_count_value, rb[i]);
-	// 			}
-	// 			_error_count++;
-	// 			if (_cl_stop_on_error) {
-	// 				dump_serial_port_stats();
-	// 				exit(1);
-	// 			}
-	// 			_read_count_value = rb[i];
-	// 		}
-	// 		_read_count_value = next_count_value(_read_count_value);
-	// 	}
-	// 	printf("\n");
-	// 	printf("rendcount:%d\n", _read_count);
-	// 	_read_count += c;
-	// }
 }
 
 void serial_process(char* serial, AndriodProduct* product)
@@ -842,34 +818,64 @@ void serial_process(char* serial, AndriodProduct* product)
 
 	printf("** \t wait write cpu ID\n");
 	fflush(stdout);
-	struct timespec start_time, last_time, last_read, last_write;
-	clock_gettime(CLOCK_MONOTONIC, &start_time);
-	last_time = start_time;
-	last_read = start_time;
-	last_write = start_time;
+	struct timespec start_write;
+	clock_gettime(CLOCK_MONOTONIC, &start_write);
 
-	while(!(_cl_no_rx && _cl_no_tx) && !STOPTEST)
+	struct timespec current;
+
+	fsm_state_t fsm;
+	if(!strcmp(serial, TTYS1Port))
+		fsm = product->TTYS1;
+	else if(!strcmp(serial, TTYS3Port))
+		fsm = product->TTYS3;
+	else
 	{
-		struct timespec current;
-		int retval = poll(&serial_poll, 1, 1000);
-		clock_gettime(CLOCK_MONOTONIC, &current);
+		printf("mddddddddddddddddddddddddddddddddddddddddd\n");
+	}
 
+	while(!STOPTEST)
+	{
+		
+		int retval = poll(&serial_poll, 1, 1000);
+		
 		if(retval == -1)
 		{
 			perror("**\t poll()");
+			usleep(10000);
+			continue;
 		}
-		else if(retval)
-		{
-			serial_process_write_data( serial, product);
-			last_read = current;
-		}
+		// else if(retval)
+		// {
+		// 	serial_process_write_data( serial, product);
+		// 	last_read = current;
+		// }
 
-		if(diff_ms(&current,&start_time) >= 10000 )//10s
+
+
+
+		switch (fsm)
 		{
-			printf("\t\t Error %s time consuming >5s but can't receive corrent data\n", serial);
+		case FSM_IDLE:
+			serial_process_write_data( serial, product, &fsm);
+			break;
+		case FSM_GET_MAC:
+			reply_end( serial, product, &fsm);
+		
+			break;
+		case FSM_GET_END:
 			STOPTEST = true;
+			break;
+		default:
+			break;
 		}
 
+	clock_gettime(CLOCK_MONOTONIC, &current);
+
+	if(diff_ms(&current,&start_write) >= 30000 )//30s
+	{
+		printf("\t\t Error %s time consuming >30s but can't receive corrent data\n", serial);
+		STOPTEST = true;
+	}
 
 	}
 

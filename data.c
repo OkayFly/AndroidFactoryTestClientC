@@ -67,25 +67,17 @@ void wrap_data(unsigned char* data, int id)
 
 }
 
-void process_data(unsigned char* data, int length, AndriodProduct* product)
+void process_data(unsigned char* data, int length, AndriodProduct* product, fsm_state_t* fsm)
 {
     switch (data[0])
     {
-    case CTRL_SEND_TTYS1_MAC:
+    case CTRL_SEND_MAC:
         get_mac(data+1, length-1, product);
-        product->TTYS1 = true;
+        *fsm= FSM_GET_MAC;
         break;
-    case CTRL_SEND_TTYS3_MAC:
-        get_mac(data+1, length-1, product);
-        product->TTYS3 = true;
-        break;
-    case CTRL_SEND_CAN0_MAC:
-        get_mac(data+1, length-1, product);
-        product->CAN0 = true;
-        break;
-    case CTRL_SEND_CAN1_MAC:
-        get_mac(data+1, length-1, product);
-        product->CAN1 = true;
+    case CTRL_SEND_END:
+        get_end(data+1, length-1, product);
+        *fsm= FSM_GET_END;
         break;
     default:
         break;
@@ -107,17 +99,43 @@ void get_mac(unsigned char* data, int length, AndriodProduct* product)
     {
 	printf("okkkkkkkkkkkkkkkkkkkkkkkkk\n");
     fflush(stdout);
-    STOPTEST = true;
     }
     else
     {
-   printf("wfk\n");
+    printf("wfk\n");
 	for(int i=0; i<strlen(CPU_ID); i++ )
 	{
 		printf("%02x ", CPU_ID[i]);
 	}
 	printf("\n");
-    STOPTEST = true;
+   
+    }
+    
+}
+
+//can not receive the cmd
+void get_end(unsigned char* data, int length, AndriodProduct* product)
+{
+    printf("** get_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_endget_end:\n");
+
+    for(int i=0; i<length; i++)
+    {
+        printf("%02x", data[i]);
+    }
+    printf("\nCPU_ID:%s\n",CPU_ID);
+    if(strncmp(data, CPU_ID, strlen(CPU_ID)) == 0)
+    {
+        printf("mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm\n");
+        fflush(stdout);
+    }
+    else
+    {
+        printf("wfk\n");
+        for(int i=0; i<strlen(CPU_ID); i++ )
+        {
+            printf("%02x ", CPU_ID[i]);
+        }
+        printf("\n");
     }
     
 }

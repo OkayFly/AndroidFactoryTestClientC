@@ -33,7 +33,7 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
     int receive_len = 0;
 
     /* set filter for only receiving packet with can id 0x88 */
-        struct can_frame frame;
+    struct can_frame frame;
     struct can_filter rfilter[1];
     rfilter[0].can_id = 0x88;
     rfilter[0].can_mask = CAN_SFF_MASK;
@@ -108,7 +108,7 @@ static void can_process_read_data(int s, char* canport, AndriodProduct* product)
         // {
         // 	printf("\t\t %02x\t", data[i]);
         // }
-        process_data(data, data_length, product);
+       // process_data(data, data_length, product); TODO
         keepRead = false;
 
     }
@@ -132,20 +132,8 @@ static int can_frame_process_write_data(int s, char* canport, AndriodProduct* pr
 {
     printf("00000000000000000000000000000000000000000000000000000000000:%s\n", canport);
 
-        char cmd;
-        if( !strncmp(canport, CAN0Port, strlen(CAN0Port)))
-        {
-            cmd = CTRL_SEND_CAN0_MAC;
-        }
-        else if(!strncmp(canport, CAN1Port, strlen(CAN1Port)))
-        {
-            cmd = CTRL_SEND_CAN1_MAC;
-        }
-        else
-        {
-            printf("EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE:%s\n", canport);
-            return 1;
-        }
+        char cmd = CTRL_SEND_MAC;
+
         
         struct can_frame frame_send;
 
@@ -254,9 +242,8 @@ static void canfd_frame_process_write_data(int s, char* canport)
 
 
     char write_data[120];
-	//wrap_data(CPU_ID, CTRL_SEND_TTYS1_MAC);
 	write_data[0] = 0xAA;
-	write_data[1] = CTRL_SEND_TTYS1_MAC;
+	write_data[1] = CTRL_SEND_MAC;
 	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
 	write_data[2+strlen(CPU_ID)] = 0x55;
 	write_data[3+strlen(CPU_ID)] = '\0';
@@ -356,7 +343,7 @@ void can_process(char* canport, AndriodProduct* product)
     struct can_frame frame_send;
 
     start_can(canport);
-    printf("**\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~serail_process:%s\n", canport);
+    printf("**\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~can_process:%s\n", canport);
     printf("**\t serail_process:%s\n", canport);
 
     //create socket
