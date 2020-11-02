@@ -32,7 +32,7 @@ static const char commandlist[NCOMMANDS][10] =
 	"END"
 };
 
-
+#define UART_BAUD 9600
 
 /*
  * glibc for MIPS has its own bits/termios.h which does not define
@@ -719,6 +719,7 @@ static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm);
 
 static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 {
+	printf_func_mark(__func__);
 	char cmd = CTRL_SEND_END;
 	char write_data[120];
 	//wrap_data(CPU_ID, CTRL_SEND_MAC);
@@ -734,7 +735,7 @@ static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 
 	}
 	ssize_t c = write(_fd, write_data,strlen(write_data));
-	usleep(100);//1s
+	usleep(1000000);//1s
 	//while(1)
 	{
 		serial_process_read_data(product, fsm);
@@ -742,8 +743,30 @@ static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 	
 }
 
+static void reply_idle(char* serial, AndriodProduct* product, fsm_state_t* fsm)
+{
+	printf_func_mark(__func__);
+	char cmd = CTRL_SEND_IDLE;
+	char write_data[120];
+	//wrap_data(CPU_ID, CTRL_SEND_MAC);
+	write_data[0] = 0xAA;
+	write_data[1] = cmd;
+	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
+	write_data[2+strlen(CPU_ID)] = 0x55;
+	write_data[3+strlen(CPU_ID)] = '\0';
+	printf("\n\t write_data:%s\n",write_data);
+	for(int i=0; i<strlen(write_data);i++)
+	{	
+		printf("%02x ", write_data[i]);
+
+	}
+	ssize_t c = write(_fd, write_data,strlen(write_data));
+	usleep(1000000);//1s
+}
+
 static void serial_process_write_data(char* serial, AndriodProduct* product, fsm_state_t* fsm)
 {
+	printf_func_mark(__func__);
 	char cmd = CTRL_SEND_MAC;
 	char write_data[120];
 	//wrap_data(CPU_ID, CTRL_SEND_MAC);
@@ -770,10 +793,13 @@ static void serial_process_write_data(char* serial, AndriodProduct* product, fsm
 
 static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm)
 {
+	printf_func_mark(__func__);
 	unsigned char rb[95] = {};
 	unsigned char data[95] = {};
 	int data_length;
 	int c = read(_fd, &rb, sizeof(rb));
+	if (c <= 0)
+		return;
 
 	if(get_data(rb, c, data, &data_length) == DATA_PROCESS_SUCCESS)
 	{
@@ -792,7 +818,13 @@ static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm)
 void serial_process(char* serial, AndriodProduct* product)
 {
 	printf("**\t serail_process1111111111:%s\n", serial);
-	int baud = B115200;
+	//int baud = B115200;
+	int baud = 115200;
+#ifdef UART_BAUT
+	baud = UART_BAUD;
+#endif
+	baud = get_baud(baud);
+
 	_cl_port = serial;
 	if(!setup_serial_port(baud))
 		return ;
@@ -823,11 +855,11 @@ void serial_process(char* serial, AndriodProduct* product)
 
 	struct timespec current;
 
-	fsm_state_t fsm;
+	fsm_state_t* fsm;
 	if(!strcmp(serial, TTYS1Port))
-		fsm = product->TTYS1;
+		fsm = &product->TTYS1;
 	else if(!strcmp(serial, TTYS3Port))
-		fsm = product->TTYS3;
+		fsm = &product->TTYS3;
 	else
 	{
 		printf("mddddddddddddddddddddddddddddddddddddddddd\n");
@@ -853,15 +885,20 @@ void serial_process(char* serial, AndriodProduct* product)
 
 
 
-		switch (fsm)
+		switch (*fsm)
 		{
 		case FSM_IDLE:
-			serial_process_write_data( serial, product, &fsm);
+			serial_process_write_data( serial, product, fsm);
 			break;
 		case FSM_GET_MAC:
-			reply_end( serial, product, &fsm);
+			reply_end( serial, product, fsm);
 			break;
 		case FSM_GET_END:
+			reply_idle(serial, product, fsm);
+			usleep(100);
+			reply_idle(serial, product, fsm);
+			usleep(100);
+			reply_idle(serial, product, fsm);
 			STOPTEST = true;
 			break;
 		default:

@@ -38,6 +38,7 @@ typedef struct
 typedef enum {
     CTRL_SEND_MAC = 0x80,
     CTRL_SEND_END,
+    CTRL_SEND_IDLE,
 }ctrl_t;
 
 DPStatus get_data( unsigned char* in,  int length,  unsigned char* out, int* out_length);

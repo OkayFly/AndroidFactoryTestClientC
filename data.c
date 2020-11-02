@@ -16,10 +16,10 @@ extern char CPU_ID[64];
 
 DPStatus get_data( unsigned char* in,  int length, unsigned char* out, int* out_length)
 {
-    printf("get_data\n");
+    printf("get_data%s, lenght:%d\n",in, length);
     for(int i=0; i<length; i++)
     {
-        printf("%0x2x ", in[i]);
+        printf("%02x ", in[i]);
     }
     printf("\n");
     bool has_head = false;
@@ -36,7 +36,11 @@ DPStatus get_data( unsigned char* in,  int length, unsigned char* out, int* out_
     }
 
     if(!has_head)
-        return DATA_HEAD_ERROR;
+    {
+        printf("DATA_HEAD_ERROR\n");
+          return DATA_HEAD_ERROR;
+    }
+      
     
     int  tail_index =0;
 
@@ -50,7 +54,10 @@ DPStatus get_data( unsigned char* in,  int length, unsigned char* out, int* out_
     }
 
     if(tail_index <1)
+    {
+        printf("DATA_TAIL_ERROR \n");
         return DATA_TAIL_ERROR;
+    }
 
     *out_length = tail_index - head_index-1;
     printf("tail_index:%d, *outlength:%d\n", tail_index, *out_length);
@@ -63,8 +70,6 @@ DPStatus get_data( unsigned char* in,  int length, unsigned char* out, int* out_
 void wrap_data(unsigned char* data, int id)
 {
 	int len = strlen(data);
-	
-
 }
 
 void process_data(unsigned char* data, int length, AndriodProduct* product, fsm_state_t* fsm)
@@ -189,16 +194,20 @@ void save_test_result(AndriodProduct* product)
     }
 
     fprintf(fp, "%s:\n",product->cpu_sn);
-    fprintf(fp, "%s:[%s]\n",TTYS1Port ,product->TTYS1 == FSM_GET_END ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",TTYS3Port ,product->TTYS3 == FSM_GET_END ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",CAN0Port ,product->CAN0 == FSM_GET_END ? "OK":"Fail");
-    fprintf(fp, "%s:[%s]\n",CAN1Port ,product->CAN1 == FSM_GET_END ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",TTYS1Port , (product->TTYS1 == FSM_GET_END) ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",TTYS3Port ,(product->TTYS3 == FSM_GET_END) ? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN0Port ,(product->CAN0 == FSM_GET_END )? "OK":"Fail");
+    fprintf(fp, "%s:[%s]\n",CAN1Port ,(product->CAN1 == FSM_GET_END) ? "OK":"Fail");
 
     fclose(fp);
     for(int i=0; i<30;i++)
     {
         printf(">");
     }
+    printf("%s:[%d]\n",TTYS1Port , (product->TTYS1));
+    printf( "%s:[%d]\n",TTYS3Port ,(product->TTYS3 ));
+    printf( "%s:[%d]\n",CAN0Port ,(product->CAN0 ));
+    printf( "%s:[%d]\n",CAN1Port ,(product->CAN1 ));
     printf("%s\n",filename);
     printf("save %s ok\n",filename);
     free(filename);
