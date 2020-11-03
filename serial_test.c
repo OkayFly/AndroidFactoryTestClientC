@@ -49,47 +49,25 @@ static const char commandlist[NCOMMANDS][10] =
 #define TIOCM_LOOP	0x8000
 #endif
 
-// command line args
-int _cl_baud = 0;
-char *_cl_port = NULL;
-int _cl_divisor = 0;
-int _cl_rx_dump = 0;
-int _cl_rx_dump_ascii = 0;
-int _cl_tx_detailed = 0;
-int _cl_stats = 0;
-int _cl_stop_on_error = 0;
-int _cl_single_byte = -1;
-int _cl_another_byte = -1;
+#define UART_BAUD 9600
+
+// USED
 int _cl_rts_cts = 0;
 int _cl_2_stop_bit = 0;
 int _cl_parity = 0;
+
+int _cl_no_rx = 0; //Don't receive data 
+int _cl_no_tx = 0; //Dont't ransmit data
+int _cl_loopback = 0; //
+
+int _cl_rs485_rts_after_send = 0; //
+int _cl_rs485_before_delay = 0; //
+int _cl_rs485_after_delay = -1; //
+
+
 int _cl_odd_parity = 0;
 int _cl_stick_parity = 0;
-int _cl_loopback = 0;
-int _cl_dump_err = 0;
-int _cl_no_rx = 0;
-int _cl_no_tx = 0;
-int _cl_rx_delay = 0;
-int _cl_tx_delay = 0;
-int _cl_tx_bytes = 0;
-int _cl_rs485_after_delay = -1;
-int _cl_rs485_before_delay = 0;
-int _cl_rs485_rts_after_send = 0;
-int _cl_tx_time = 0;
-int _cl_rx_time = 0;
-int _cl_ascii_range = 0;
 
-// Module variables
-unsigned char _write_count_value = 0;
-unsigned char _read_count_value = 0;
-int _fd = -1;
-unsigned char * _write_data;
-ssize_t _write_size;
-
-// keep our own counts for cases where the driver stats don't work
-long long int _write_count = 0;
-long long int _read_count = 0;
-long long int _error_count = 0;
 
 static void dump_data(unsigned char * b, int count)
 {
@@ -110,11 +88,11 @@ static void dump_data_ascii(unsigned char * b, int count)
 	}
 }
 
-static void set_baud_divisor(int speed, int custom_divisor)
+static void set_baud_divisor(int fd, int speed, int custom_divisor)
 {
 	// default baud was not found, so try to set a custom divisor
 	struct serial_struct ss;
-	if (ioctl(_fd, TIOCGSERIAL, &ss) < 0) {
+	if (ioctl(fd, TIOCGSERIAL, &ss) < 0) {
 		perror("TIOCGSERIAL failed");
 		exit(1);
 	}
@@ -135,16 +113,16 @@ static void set_baud_divisor(int speed, int custom_divisor)
 				ss.custom_divisor);
 	}
 
-	if (ioctl(_fd, TIOCSSERIAL, &ss) < 0) {
+	if (ioctl(fd, TIOCSSERIAL, &ss) < 0) {
 		perror("TIOCSSERIAL failed");
 		exit(1);
 	}
 }
 
-static void clear_custom_speed_flag()
+static void clear_custom_speed_flag(int fd)
 {
 	struct serial_struct ss;
-	if (ioctl(_fd, TIOCGSERIAL, &ss) < 0) {
+	if (ioctl(fd, TIOCGSERIAL, &ss) < 0) {
 		// return silently as some devices do not support TIOCGSERIAL
 		return;
 	}
@@ -154,7 +132,7 @@ static void clear_custom_speed_flag()
 
 	ss.flags &= ~ASYNC_SPD_MASK;
 
-	if (ioctl(_fd, TIOCSSERIAL, &ss) < 0) {
+	if (ioctl(fd, TIOCSSERIAL, &ss) < 0) {
 		perror("TIOCSSERIAL failed");
 		exit(1);
 	}
@@ -281,259 +259,21 @@ static void display_help(void)
 	      );
 }
 
-static void process_options(int argc, char * argv[])
-{
-	for (;;) {
-		int option_index = 0;
-		static const char *short_options = "hb:p:d:R:TsSy:z:cBertq:Ql:a:w:o:i:P:kA";
-		static const struct option long_options[] = {
-			{"help", no_argument, 0, 0},
-			{"baud", required_argument, 0, 'b'},
-			{"port", required_argument, 0, 'p'},
-			{"divisor", required_argument, 0, 'd'},
-			{"rx_dump", required_argument, 0, 'R'},
-			{"detailed_tx", no_argument, 0, 'T'},
-			{"stats", required_argument, 0, 's'},
-			//{"stats", no_argument, 0, 's'},
-			{"stop-on-err", no_argument, 0, 'S'},
-			{"single-byte", no_argument, 0, 'y'},
-			{"second-byte", no_argument, 0, 'z'},
-			{"rts-cts", no_argument, 0, 'c'},
-			{"2-stop-bit", no_argument, 0, 'B'},
-			{"parity", required_argument, 0, 'P'},
-			{"loopback", no_argument, 0, 'k'},
-			{"dump-err", no_argument, 0, 'e'},
-			{"no-rx", no_argument, 0, 'r'},
-			{"no-tx", no_argument, 0, 't'},
-			{"rx-delay", required_argument, 0, 'l'},
-			{"tx-delay", required_argument, 0, 'a'},
-			{"tx-bytes", required_argument, 0, 'w'},
-			{"rs485", required_argument, 0, 'q'},
-			{"rs485_rts", no_argument, 0, 'Q'},
-			{"tx-time", required_argument, 0, 'o'},
-			{"rx-time", required_argument, 0, 'i'},
-			{"ascii", no_argument, 0, 'A'},
-			{0,0,0,0},
-		};
-
-		int c = getopt_long(argc, argv, short_options,
-				long_options, &option_index);
-
-		if (c == EOF) {
-			break;
-		}
-
-		switch (c) {
-		case 0:
-		case 'h':
-			display_help();
-			exit(0);
-			break;
-		case 'b':
-			_cl_baud = atoi(optarg);
-			break;
-		case 'p':
-			_cl_port = strdup(optarg);
-			break;
-		case 'd':
-			_cl_divisor = strtol(optarg, NULL, 0);
-			break;
-		case 'R':
-			_cl_rx_dump = 1;
-			_cl_rx_dump_ascii = !strcmp(optarg, "ascii");
-			break;
-		case 'T':
-			_cl_tx_detailed = 1;
-			break;
-		case 's':
-			_cl_stats = 1;
-			char *endptr;
-			_cl_rx_time = strtol(optarg, &endptr, 0);
-			printf("s:%d\n",_cl_rx_time);
-			
-			break;
-		case 'S':
-			_cl_stop_on_error = 1;
-			break;
-		case 'y': {
-			char * endptr;
-			_cl_single_byte = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'z': {
-			char * endptr;
-			_cl_another_byte = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'c':
-			_cl_rts_cts = 1;
-			break;
-		case 'B':
-			_cl_2_stop_bit = 1;
-			break;
-		case 'P':
-			_cl_parity = 1;
-			_cl_odd_parity = (!strcmp(optarg, "mark")||!strcmp(optarg, "odd"));
-			_cl_stick_parity = (!strcmp(optarg, "mark")||!strcmp(optarg, "space"));
-			break;
-		case 'k':
-			_cl_loopback = 1;
-			break;
-		case 'e':
-			_cl_dump_err = 1;
-			break;
-		case 'r':
-			_cl_no_rx = 1;
-			break;
-		case 't':
-			_cl_no_tx = 1;
-			break;
-		case 'l': {
-			char *endptr;
-			_cl_rx_delay = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'a': {
-			char *endptr;
-			_cl_tx_delay = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'w': {
-			char *endptr;
-			_cl_tx_bytes = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'q': {
-			char *endptr;
-			_cl_rs485_after_delay = strtol(optarg, &endptr, 0);
-			_cl_rs485_before_delay = strtol(endptr+1, &endptr, 0);
-			break;
-		}
-		case 'Q':
-			_cl_rs485_rts_after_send = 1;
-			break;
-		case 'o': {
-			char *endptr;
-			_cl_tx_time = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'i': {
-			char *endptr;
-			_cl_rx_time = strtol(optarg, &endptr, 0);
-			break;
-		}
-		case 'A':
-			_cl_ascii_range = 1;
-			break;
-		}
-	}
-}
-
-static void dump_serial_port_stats(void)
-{
-	struct serial_icounter_struct icount = { 0 };
-
-	printf("%s: count for this session: rx=%lld, tx=%lld, rx err=%lld\n", _cl_port, _read_count, _write_count, _error_count);
-
-	int ret = ioctl(_fd, TIOCGICOUNT, &icount);
-	if (ret != -1) {
-		printf("%s: TIOCGICOUNT: ret=%i, rx=%i, tx=%i, frame = %i, overrun = %i, parity = %i, brk = %i, buf_overrun = %i\n",
-				_cl_port, ret, icount.rx, icount.tx, icount.frame, icount.overrun, icount.parity, icount.brk,
-				icount.buf_overrun);
-	}
-}
-
-static unsigned char next_count_value(unsigned char c)
-{
-	c++;
-	if (_cl_ascii_range && c == 127)
-		c = 32;
-	return c;
-}
-
-static void process_read_data(void)
-{
-	unsigned char rb[95];
-
-	//unsigned char rb[1024];
-	int c = read(_fd, &rb, sizeof(rb));
-	if (c > 0) {
-		if (_cl_rx_dump) {
-			if (_cl_rx_dump_ascii)
-				dump_data_ascii(rb, c);
-			else
-				dump_data(rb, c);
-		}
-
-		// verify read count is incrementing
-		int i;
-		for (i = 0; i < c; i++) {
-			if (rb[i] != _read_count_value) {
-				if (_cl_dump_err) {
-					printf("Error, count: %lld, expected %02x, got %02x\n",
-							_read_count + i, _read_count_value, rb[i]);
-				}
-				_error_count++;
-				if (_cl_stop_on_error) {
-					dump_serial_port_stats();
-					exit(1);
-				}
-				_read_count_value = rb[i];
-			}
-			_read_count_value = next_count_value(_read_count_value);
-		}
-		_read_count += c;
-	}
-}
-
-static void process_write_data(void)
-{
-	ssize_t count = 0;
-	int repeat = (_cl_tx_bytes == 0);
-
-	do
-	{
-		ssize_t i;
-		for (i = 0; i < _write_size; i++) {
-			_write_data[i] = _write_count_value;
-			_write_count_value = next_count_value(_write_count_value);
-		}
-
-		ssize_t c = write(_fd, _write_data, _write_size);
-
-		if (c < 0) {
-			if (errno != EAGAIN) {
-				printf("write failed - errno=%d (%s)\n", errno, strerror(errno));
-			}
-			c = 0;
-		}
-
-		count += c;
-
-		if (c < _write_size) {
-			_write_count_value = _write_data[c];
-			repeat = 0;
-		}
-	} while (repeat);
-
-	_write_count += count;
-
-	if (_cl_tx_detailed)
-		printf("wrote %zd bytes\n", count);
-}
 
 
-static bool setup_serial_port(int baud)
+
+
+static bool setup_serial(int baud, char* port, int *fd)
 {
 	struct termios newtio;
 	struct serial_rs485 rs485;
 
-	_fd = open(_cl_port, O_RDWR | O_NONBLOCK);
+	*fd = open(port, O_RDWR | O_NONBLOCK);
 
-	if (_fd < 0) {
+	if (*fd < 0) {
 		perror("Error opening serial port");
-		free(_cl_port);
-	//	exit(1);
+		//free(_cl_port1);?????????????????TODO
+		//exit(1);
 		return false;
 	}
 
@@ -559,6 +299,7 @@ static bool setup_serial_port(int baud)
 			newtio.c_cflag |= CMSPAR;
 		}
 	}
+
 	newtio.c_iflag = 0;
 	newtio.c_oflag = 0;
 	newtio.c_lflag = 0;
@@ -570,14 +311,14 @@ static bool setup_serial_port(int baud)
 	newtio.c_cc[VTIME] = 5;
 
 	/* now clean the modem line and activate the settings for the port */
-	tcflush(_fd, TCIOFLUSH);
-	tcsetattr(_fd,TCSANOW,&newtio);
+	tcflush(*fd, TCIOFLUSH);
+	tcsetattr(*fd,TCSANOW,&newtio);
 
 	/* enable/disable rs485 direction control */
-	if(ioctl(_fd, TIOCGRS485, &rs485) < 0) {
+	if(ioctl(*fd, TIOCGRS485, &rs485) < 0) {
 		if (_cl_rs485_after_delay >= 0) {
 			/* error could be because hardware is missing rs485 support so only print when actually trying to activate it */
-			perror("info getting RS-485 mode");
+			//perror("Error getting RS-485 mode");
 		}
 	} else if (_cl_rs485_after_delay >= 0) {
 		rs485.flags |= SER_RS485_ENABLED | SER_RS485_RX_DURING_TX |
@@ -585,15 +326,15 @@ static bool setup_serial_port(int baud)
 		rs485.flags &= ~(_cl_rs485_rts_after_send ? SER_RS485_RTS_ON_SEND : SER_RS485_RTS_AFTER_SEND);
 		rs485.delay_rts_after_send = _cl_rs485_after_delay;
 		rs485.delay_rts_before_send = _cl_rs485_before_delay;
-		if(ioctl(_fd, TIOCSRS485, &rs485) < 0) {
-			perror("info setting RS-485 mode");
+		if(ioctl(*fd, TIOCSRS485, &rs485) < 0) {
+			//perror("Error setting RS-485 mode");
 		}
 	} else {
 		rs485.flags &= ~(SER_RS485_ENABLED | SER_RS485_RTS_ON_SEND | SER_RS485_RTS_AFTER_SEND);
 		rs485.delay_rts_after_send = 0;
 		rs485.delay_rts_before_send = 0;
-		if(ioctl(_fd, TIOCSRS485, &rs485) < 0) {
-			perror("info setting RS-232 mode");
+		if(ioctl(*fd, TIOCSRS485, &rs485) < 0) {
+			//perror("Error setting RS-232 mode");
 		}
 	}
 
@@ -602,206 +343,114 @@ static bool setup_serial_port(int baud)
 
 
 
-bool check_count(const char* p)
-{
-	bool ret = true;
-
-	if(p == NULL)
-		return false;
-	else
-	{
-		while(*p != '\0')
-		{
-			if(*p <= '9' && *p++ >= '0')
-				continue;
-			else
-			{
-				return false;
-			}
-			
-		}
-	}
-	
-
-	return ret;
-}
-static void append_count(struct command* c, char* s)
-{
-	if(check_count(s))
-		c->count = atoi(s);
-	else
-	{
-		printf("--_--%s is not count\n",s);
-	}
-	
-	
-}
-
-static char* enum2str(int comid)
-{
-	switch (comid)
-	{
-	case START:
-		return "START";
-		break;
-	case END:
-		return "END";
-		break;
-	
-	default:
-		break;
-	}
-
-	return NULL;
-}
-
-struct command* userinputtocommand(char s[LENUSERINPUT])
-{
-	//printf("userinput:%s\n",s);
-	struct command* cmd = (struct command*) malloc(sizeof(struct command));
-	cmd->comid = -1;
-	cmd->count = -1;
-	int i, j;
-	char* token;
-	char* savestate;
-	for(i=0; ;i++, s=NULL)
-	{
-		token = strtok_r(s, " \t\n", &savestate);
-		//printf("token:%s\n",token);
-		if(token == NULL)
-			break;
-
-		if(cmd->comid == -1 )
-		{
-			for(j=0; i<NCOMMANDS; j++)
-			{
-				if(!strcmp(token, commandlist[j]))
-				{
-					cmd->comid = j;
-					break;
-				}
-			}
-		}
-		else
-		{
-			if(cmd->comid == START)
-			{
-				append_count(cmd, token);
-			}
-		}
-
-	}
-
-	if(cmd->comid != -1 && cmd->count != -1)
-	{
-		printf("\t\tcmd:[%s]\n", enum2str(cmd->comid));
-		printf("\t\tcount:[%d]\n",cmd->count);
-		return cmd;
-	}
-	else
-	{
-		if(cmd->comid == -1)
-			printf("Please input [START] \n");
-		else
-		{
-			printf("pleas after [START] input count num\n");
-		}
-		
-		fprintf(stderr, "\t Error parsing command\n");
-		return NULL;
-	}
-
-}
 
 
-static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm);
+static void serial_process_read_data(char* buf, int *buff_len, AndriodProduct* product, int fd,  fsm_state_t* fsm);
 
 
-static void reply_end(char* serial, AndriodProduct* product, fsm_state_t* fsm)
+static void reply_end(char*buf,  int* buff_len, char* serial, AndriodProduct* product, int fd, fsm_state_t* fsm)
 {
 	printf_func_mark(__func__);
 	char cmd = CTRL_SEND_END;
-	char write_data[120];
-	//wrap_data(CPU_ID, CTRL_SEND_MAC);
+	char write_data[120] = {0};
 	write_data[0] = 0xAA;
 	write_data[1] = cmd;
-	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
-	write_data[2+strlen(CPU_ID)] = 0x55;
-	write_data[3+strlen(CPU_ID)] = '\0';
+	printf("1");
+	memcpy(write_data+2, product->cpu_sn, strlen(product->cpu_sn));
+	printf("1 :%d\n", strlen(product->cpu_sn));
+	write_data[2+strlen(product->cpu_sn)] = 0x55;
+	write_data[3+strlen(product->cpu_sn)] = '\0';
+	printf("1");
 	printf("\n\t write_data:%s\n",write_data);
+	fflush(stdout);
 	for(int i=0; i<strlen(write_data);i++)
 	{	
 		printf("%02x ", write_data[i]);
 
 	}
-	ssize_t c = write(_fd, write_data,strlen(write_data));
+	ssize_t c = write(fd, write_data,strlen(write_data));
+
+	printf("\n****\twrit size:%d\n", c);
 	usleep(1000000);//1s
 	//while(1)
 	{
-		serial_process_read_data(product, fsm);
+		serial_process_read_data(buf, buff_len, product, fd,  fsm);
 	}
 	
 }
 
-static void reply_idle(char* serial, AndriodProduct* product, fsm_state_t* fsm)
+static void reply_idle(char* serial, int fd,  AndriodProduct* product, fsm_state_t* fsm)
 {
 	printf_func_mark(__func__);
 	char cmd = CTRL_SEND_IDLE;
 	char write_data[120];
-	//wrap_data(CPU_ID, CTRL_SEND_MAC);
 	write_data[0] = 0xAA;
 	write_data[1] = cmd;
-	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
-	write_data[2+strlen(CPU_ID)] = 0x55;
-	write_data[3+strlen(CPU_ID)] = '\0';
+	memcpy(write_data+2, product->cpu_sn, strlen(product->cpu_sn));
+	write_data[2+strlen(product->cpu_sn)] = 0x55;
+	write_data[3+strlen(product->cpu_sn)] = '\0';
 	printf("\n\t write_data:%s\n",write_data);
 	for(int i=0; i<strlen(write_data);i++)
 	{	
 		printf("%02x ", write_data[i]);
 
 	}
-	ssize_t c = write(_fd, write_data,strlen(write_data));
+	ssize_t c = write(fd, write_data,strlen(write_data));
 	usleep(1000000);//1s
 }
 
-static void serial_process_write_data(char* serial, AndriodProduct* product, fsm_state_t* fsm)
+static void serial_process_write_data(char* buff,  int* buff_len, char* serial, int fd, AndriodProduct* product, fsm_state_t* fsm)
 {
 	printf_func_mark(__func__);
 	char cmd = CTRL_SEND_MAC;
 	char write_data[120];
-	//wrap_data(CPU_ID, CTRL_SEND_MAC);
 	write_data[0] = 0xAA;
 	write_data[1] = cmd;
-	memcpy(write_data+2, CPU_ID, strlen(CPU_ID));
-	write_data[2+strlen(CPU_ID)] = 0x55;
-	write_data[3+strlen(CPU_ID)] = '\0';
+	memcpy(write_data+2, product->cpu_sn, strlen(product->cpu_sn));
+	write_data[2+strlen(product->cpu_sn)] = 0x55;
+	write_data[3+strlen(product->cpu_sn)] = '\0';
 	printf("\n\t write_data:%s\n",write_data);
 	for(int i=0; i<strlen(write_data);i++)
 	{	
 		printf("%02x ", write_data[i]);
 
 	}
-	ssize_t c = write(_fd, write_data,strlen(write_data));
+	ssize_t c = write(fd, write_data,strlen(write_data));
 	usleep(1000000);//1s
 	//while(1)
 	{
-		serial_process_read_data(product, fsm);
+		serial_process_read_data(buff, buff_len, product, fd,  fsm);
 	}
 	
 }
 
 
-static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm)
+static void serial_process_read_data(char* buff, int* buff_len, AndriodProduct* product,  int fd, fsm_state_t* fsm)
 {
 	printf_func_mark(__func__);
 	unsigned char rb[95] = {};
 	unsigned char data[95] = {};
 	int data_length;
-	int c = read(_fd, &rb, sizeof(rb));
+	int c = read(fd, &rb, sizeof(rb));
 	if (c <= 0)
 		return;
 
-	if(get_data(rb, c, data, &data_length) == DATA_PROCESS_SUCCESS)
+	printf(":c:%d\n",c);
+	fflush(stdout);
+	for(int i=0; i<c; i++)
+	{
+		printf("[%02x]",rb[i]);
+	}
+
+	printf("\n");
+	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+
+	//put int serail buffer //TODO 超过了怎么说
+	*buff_len = strlen(buff);
+	memcpy(&buff[*buff_len], rb, c);
+	*buff_len += c;
+
+	if(parse_data(buff, *buff_len, data, &data_length) == DATA_PROCESS_SUCCESS)
 	{
 		
 		printf("=====================================>get data:%s, length[%d]\n",data, data_length);
@@ -812,28 +461,90 @@ static void serial_process_read_data(AndriodProduct* product, fsm_state_t* fsm)
 		}
 		process_data(data, data_length, product, fsm);
 	
+
+		memset(buff,0,1024);
+		*buff_len = 0;
+	
 	}
 }
 
-void serial_process(char* serial, AndriodProduct* product)
+
+
+
+void serial_process_t(void* params)
 {
-	printf("**\t serail_process1111111111:%s\n", serial);
-	//int baud = B115200;
+
+	printf_func_mark(__func__);
+	parameters *data = (parameters*) params;
+
 	int baud = 115200;
 #ifdef UART_BAUT
 	baud = UART_BAUD;
 #endif
 	baud = get_baud(baud);
 
-	_cl_port = serial;
-	if(!setup_serial_port(baud))
-		return ;
-	clear_custom_speed_flag();
-	if(!set_modem_lines(_fd, _cl_loopback ? TIOCM_LOOP : 0, TIOCM_LOOP))
-		return;
 
+	char *serial_port;
+	serial_port = data->port;
+
+	fsm_state_t*  fsm;
+	if( !strcmp(serial_port, TTYS1Port))
+	{
+		printf("@@@1\n");
+		fsm = &data->product->TTYS1;
+	}
+	else if(!strcmp(serial_port, TTYS3Port))
+	{
+		printf("@@@1\n");
+		fsm = &data->product->TTYS3;
+	}
+	else
+	{
+		fsm = &data->product->TTYS1;
+		printf("????????????????wtftttyUSB0\n");
+	}
+	
+
+	int serial_fd = -1;
+
+	if(!setup_serial(baud,serial_port, &serial_fd))
+	{
+		perror("set serial port baud");
+		printf("port:%s\n",serial_port);
+		free(data->port);
+		return;
+		//	exit;//??????????????
+	}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+	//clear_custom_speed_flag
+	struct serial_struct ss;
+	if (ioctl(serial_fd, TIOCGSERIAL, &ss) < 0) {
+		// return silently as some devices do not support TIOCGSERIAL
+		return;
+	}
+	if ((ss.flags & ASYNC_SPD_MASK) != ASYNC_SPD_CUST)
+	{
+		printf("222 wtf todo\n");
+	}
+		//return;
+	ss.flags &= ~ASYNC_SPD_MASK;
+	if (ioctl(serial_fd, TIOCSSERIAL, &ss) < 0) {
+		perror("TIOCSSERIAL failed");
+		//exit(1);
+	}
+	printf("3333\n");
+	if(!set_modem_lines(serial_fd, _cl_loopback ? TIOCM_LOOP : 0, TIOCM_LOOP))
+	{
+		perror("et_modem_lines");
+		return;
+		//	exit;//??????????????
+
+	}
+
+/////////////////////////////////////////////////////////////////////////////////////////
 	struct pollfd serial_poll;
-	serial_poll.fd = _fd;
+	serial_poll.fd = serial_fd;
 	if(!_cl_no_rx)
 		serial_poll.events |= POLLIN;
 	else
@@ -848,26 +559,18 @@ void serial_process(char* serial, AndriodProduct* product)
 	}
 
 
-	printf("** \t wait write cpu ID\n");
-	fflush(stdout);
-	struct timespec start_time;
+	printf("** \n\t %s ------ wait write cpu ID\n", serial_port);
+	struct timespec  start_time;
 	clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-	struct timespec current;
 
-	fsm_state_t* fsm;
-	if(!strcmp(serial, TTYS1Port))
-		fsm = &product->TTYS1;
-	else if(!strcmp(serial, TTYS3Port))
-		fsm = &product->TTYS3;
-	else
+	struct timespec current_time;
+	char serial_buff[1024] = {0};
+	int  buff_len =0;
+	bool stoptest = false;
+	while(!stoptest)
 	{
-		printf("mddddddddddddddddddddddddddddddddddddddddd\n");
-	}
 
-	while(!STOPTEST)
-	{
-		
 		int retval = poll(&serial_poll, 1, 1000);
 		
 		if(retval == -1)
@@ -882,54 +585,44 @@ void serial_process(char* serial, AndriodProduct* product)
 		// 	last_read = current;
 		// }
 
-
-
-
 		switch (*fsm)
 		{
 		case FSM_IDLE:
-			serial_process_write_data( serial, product, fsm);
+			serial_process_write_data( serial_buff, &buff_len,serial_port, serial_fd, data->product, fsm);
 			break;
 		case FSM_GET_MAC:
-			reply_end( serial, product, fsm);
+			reply_end( serial_buff, &buff_len, serial_port, data->product, serial_fd, fsm);
 			break;
 		case FSM_GET_END:
-			reply_idle(serial, product, fsm);
+			reply_idle(serial_port, serial_fd, data->product, fsm);
 			usleep(100);
-			reply_idle(serial, product, fsm);
+			reply_idle(serial_port, serial_fd, data->product, fsm);
 			usleep(100);
-			reply_idle(serial, product, fsm);
-			STOPTEST = true;
+			reply_idle(serial_port, serial_fd, data->product, fsm);
+			*fsm = FSM_TEST_OK;
+			stoptest = true;
 			break;
 		default:
 			break;
 		}
 
-	clock_gettime(CLOCK_MONOTONIC, &current);
+		clock_gettime(CLOCK_MONOTONIC, &current_time);
 
-	if(diff_ms(&current,&start_time) >= 30000 )//30s
-	{
-		printf("\t\t Error %s time consuming >30s but can't receive corrent data\n", serial);
-		STOPTEST = true;
-	}
+		if(diff_ms(&current_time,&start_time) >= 30000 )//30s
+		{
+			printf("\t\t Error %s time consuming >30s but can't receive corrent data\n", serial_port);
+			*fsm = FSM_TEST_FAIL;
+			stoptest = true;
+		}
 
 	}
 
 	//close serial
-	printf("**\t close serial:%s\n", serial);
+	printf("**\t close serial:%s\n", data->port);
 	fflush(stdout);
-	tcdrain(_fd);
-	dump_serial_port_stats();
-	set_modem_lines(_fd, 0, TIOCM_LOOP);
-	tcflush(_fd, TCIOFLUSH);
-	//free(_cl_port);
-	STOPTEST = false;
-
-}
-
-
-void serial_test(AndriodProduct* product)
-{
-	serial_process(TTYS1Port, product);
-	serial_process(TTYS3Port, product);
+	tcdrain(serial_fd);
+	set_modem_lines(serial_fd, 0, TIOCM_LOOP);
+	tcflush(serial_fd, TCIOFLUSH);
+	free(serial_port);
+	return;
 }
